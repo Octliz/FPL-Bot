@@ -1,3 +1,13 @@
+from flask import Flask, jsonify, request, render_template, send_file, make_response
+import requests
+import pandas as pd
+from datetime import datetime
+from functools import lru_cache
+import os
+from apscheduler.schedulers.background import BackgroundScheduler
+
+app = Flask(__name__, template_folder="templates", static_folder="static")
+
 # /fpl_bot/fetch_data.py
 
 # ... (existing imports and code unchanged above)
