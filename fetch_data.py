@@ -6,6 +6,8 @@ TRANSFER_URL_TEMPLATE = "https://fantasy.premierleague.com/api/transfers/"
 
 # ... (existing routes)
 
+app = Flask(__name__, template_folder="templates", static_folder="static")
+
 @app.route("/transfer_plan", methods=["POST"])
 def transfer_plan():
     try:
@@ -38,6 +40,7 @@ def transfer_plan():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+app = Flask(__name__, template_folder="templates", static_folder="static")
 
 @app.route("/execute_transfer", methods=["POST"])
 def execute_transfer():
@@ -74,3 +77,4 @@ def execute_transfer():
             return jsonify({"error": "Transfer failed", "details": response.text}), response.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
