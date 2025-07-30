@@ -40,13 +40,74 @@
   <div id="result"></div>
 
   <script>
-    document.getElementById("teamForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
-      const teamId = document.getElementById("team_id").value;
-      const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
-      const data = await res.json();
-      document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+document.getElementById("teamForm").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  const teamId = document.getElementById("team_id").value;
+  const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
+  const data = await res.json();
+
+  const resultDiv = document.getElementById("result");
+  resultDiv.innerHTML = "";
+
+  if (data.team_summary && data.team_summary.length) {
+    const summaryTable = document.createElement("table");
+    summaryTable.border = 1;
+    summaryTable.style.marginBottom = "2rem";
+    summaryTable.innerHTML = `
+      <caption><strong>Team Summary</strong></caption>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Form</th>
+          <th>PPG</th>
+          <th>Position</th>
+          <th>Cost</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.team_summary.map(player =>
+          `<tr>
+            <td>${player.name}</td>
+            <td>${player.form}</td>
+            <td>${player.points_per_game}</td>
+            <td>${player.position}</td>
+            <td>${player.now_cost}</td>
+            <td>${player.status}</td>
+          </tr>`
+        ).join("")}
+      </tbody>
+    `;
+    resultDiv.appendChild(summaryTable);
+  }
+
+  if (data.weakest_recommendations) {
+    data.weakest_recommendations.forEach((entry) => {
+      const outPlayer = entry.out;
+      const table = document.createElement("table");
+      table.border = 1;
+      table.style.marginBottom = "2rem";
+      table.innerHTML = `
+        <caption><strong>Replace: ${outPlayer}</strong></caption>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Form</th>
+            <th>PPG</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${entry.recommendations.map(r =>
+            `<tr><td>${r.name}</td><td>${r.form}</td><td>${r.points_per_game}</td></tr>`
+          ).join("")}
+        </tbody>
+      `;
+      resultDiv.appendChild(table);
     });
-  </script>
+  } else {
+    resultDiv.textContent = "No suggestions available.";
+  }
+});
+</script>
 </body>
 </html>
