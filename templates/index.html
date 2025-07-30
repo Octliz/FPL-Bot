@@ -1,113 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>FPL Assistant</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 2rem;
-      background-color: #f9f9f9;
-      color: #333;
-    }
-    h1 {
-      color: #006400;
-    }
-    input, button {
-      padding: 0.5rem;
-      margin-right: 0.5rem;
-      font-size: 1rem;
-    }
-    #result {
-      background: #eee;
-      border: 1px solid #ccc;
-      padding: 1rem;
-      margin-top: 1rem;
-      white-space: pre-wrap;
-    }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <h1>FPL Assistant is Running!</h1>
-  <h2>Analyze Your Team</h2>
+<body class="bg-gray-100 text-gray-800 font-sans p-6">
+  <div class="max-w-xl mx-auto bg-white shadow-md rounded-xl p-6">
+    <h1 class="text-2xl font-bold text-center mb-4">FPL Assistant</h1>
+    <form id="teamForm" class="flex flex-col gap-3">
+      <label for="team_id" class="text-sm font-medium">Enter FPL Team ID:</label>
+      <input type="text" id="team_id" name="team_id" class="border rounded px-3 py-2" required />
+      <button type="submit" class="bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700">Analyze</button>
+    </form>
 
-  <form id="teamForm">
-    <label for="team_id">Enter FPL Team ID:</label>
-    <input type="text" id="team_id" name="team_id" required>
-    <button type="submit">Analyze</button>
-  </form>
-
-  <div id="result"></div>
+    <div id="output" class="mt-6 p-4 bg-gray-50 border rounded overflow-auto text-sm whitespace-pre-wrap font-mono"></div>
+  </div>
 
   <script>
-document.getElementById("teamForm").addEventListener("submit", async function (e) {
-  e.preventDefault();
-  const teamId = document.getElementById("team_id").value;
-  const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
-  const data = await res.json();
+    const form = document.getElementById('teamForm');
+    const output = document.getElementById('output');
 
-  const resultDiv = document.getElementById("result");
-  resultDiv.innerHTML = "";
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const teamId = document.getElementById('team_id').value;
+      output.textContent = 'Loading...';
 
-  if (data.team_summary && data.team_summary.length) {
-    const summaryTable = document.createElement("table");
-    summaryTable.border = 1;
-    summaryTable.style.marginBottom = "2rem";
-    summaryTable.innerHTML = `
-      <caption><strong>Team Summary</strong></caption>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Form</th>
-          <th>PPG</th>
-          <th>Position</th>
-          <th>Cost</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${data.team_summary.map(player =>
-          `<tr>
-            <td>${player.name}</td>
-            <td>${player.form}</td>
-            <td>${player.points_per_game}</td>
-            <td>${player.position}</td>
-            <td>${player.now_cost}</td>
-            <td>${player.status}</td>
-          </tr>`
-        ).join("")}
-      </tbody>
-    `;
-    resultDiv.appendChild(summaryTable);
-  }
-
-  if (data.weakest_recommendations) {
-    data.weakest_recommendations.forEach((entry) => {
-      const outPlayer = entry.out;
-      const table = document.createElement("table");
-      table.border = 1;
-      table.style.marginBottom = "2rem";
-      table.innerHTML = `
-        <caption><strong>Replace: ${outPlayer}</strong></caption>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Form</th>
-            <th>PPG</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${entry.recommendations.map(r =>
-            `<tr><td>${r.name}</td><td>${r.form}</td><td>${r.points_per_game}</td></tr>`
-          ).join("")}
-        </tbody>
-      `;
-      resultDiv.appendChild(table);
+      try {
+        const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
+        const data = await res.json();
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        output.textContent = 'Error: ' + err.message;
+      }
     });
-  } else {
-    resultDiv.textContent = "No suggestions available.";
-  }
-});
-</script>
+  </script>
 </body>
 </html>
