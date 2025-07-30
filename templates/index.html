@@ -1,21 +1,52 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>FPL Bot</title>
+  <title>FPL Assistant</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    h1 {
+      color: #006400;
+    }
+    input, button {
+      padding: 0.5rem;
+      margin-right: 0.5rem;
+      font-size: 1rem;
+    }
+    #result {
+      background: #eee;
+      border: 1px solid #ccc;
+      padding: 1rem;
+      margin-top: 1rem;
+      white-space: pre-wrap;
+    }
+  </style>
 </head>
 <body>
   <h1>FPL Assistant is Running!</h1>
-
   <h2>Analyze Your Team</h2>
-  <form method="get" action="/my_team_analysis">
+
+  <form id="teamForm">
     <label for="team_id">Enter FPL Team ID:</label>
-    <input type="text" name="team_id" id="team_id" required>
+    <input type="text" id="team_id" name="team_id" required>
     <button type="submit">Analyze</button>
   </form>
 
-  <p style="margin-top:20px;">
-    <em>You'll see JSON data directly in the browser when submitted.</em>
-  </p>
+  <div id="result"></div>
+
+  <script>
+    document.getElementById("teamForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const teamId = document.getElementById("team_id").value;
+      const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
+      const data = await res.json();
+      document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+    });
+  </script>
 </body>
 </html>
