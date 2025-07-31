@@ -61,7 +61,7 @@ def login():
     else:
         return jsonify({"error": "Login failed"}), 401
 
-@app.route("/my_team_analysis")
+@app.route("/my_team_analysis", methods=["GET"])
 def my_team_analysis():
     team_id = request.args.get("team_id")
     if not team_id:
@@ -89,36 +89,12 @@ def my_team_analysis():
 
     replacements = []
     for _, row in weak_players.iterrows():
-        same_position_pool = df[(df['position'] == my_team_df.loc[my_team_df['id'] == row['id'], 'position'].values[0]) & (~df['id'].isin(player_ids))]
+        same_position = my_team_df.loc[my_team_df['id'] == row['id'], 'position'].values[0]
+        same_position_pool = df[(df['position'] == same_position) & (~df['id'].isin(player_ids))]
         suggestion = same_position_pool.head(3)[['name', 'form', 'points_per_game']].to_dict(orient='records')
         replacements.append({"out": row['name'], "recommendations": suggestion})
 
-    return jsonify({
-        "team_summary": my_team_df.to_dict(orient="records"),
-        "weakest_recommendations": replacements
-    })
-
-def extract_player_stats(data):
-    players = data['elements']
-    teams = {team['id']: team['name'] for team in data['teams']}
-    positions = {pos['id']: pos['singular_name_short'] for pos in data['element_types']}
-
-    elements_df = pd.DataFrame(players)
-    stats_df = elements_df[[
-        'id', 'first_name', 'second_name', 'web_name',
-        'now_cost', 'form', 'total_points', 'minutes',
-        'goals_scored', 'assists', 'clean_sheets',
-        'selected_by_percent', 'transfers_in_event', 'transfers_out_event',
-        'in_dreamteam', 'status', 'points_per_game', 'team', 'element_type'
-    ]].copy()
-
-    stats_df['now_cost'] = stats_df['now_cost'] / 10.0
-    stats_df['name'] = stats_df['first_name'] + ' ' + stats_df['second_name']
-    stats_df['team_name'] = stats_df['team'].map(teams)
-    stats_df['position'] = stats_df['element_type'].map(positions)
-    stats_df = stats_df[~stats_df['status'].isin(['i', 'd', 's', 'n'])]
-
-    return stats_df.sort_values(by='form', ascending=False)
+    return render_template("analysis.html", team=my_team_df.to_dict(orient="records"), replacements=replacements)
 
 @app.route("/transfer_plan", methods=["POST"])
 def transfer_plan():

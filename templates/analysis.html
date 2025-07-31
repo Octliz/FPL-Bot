@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Team Analysis</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 2rem;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 0.5rem;
+      text-align: left;
+    }
+    th {
+      background-color: #f4f4f4;
+    }
+    .section {
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>FPL Team Analysis</h1>
+
+  <div class="section">
+    <h2>Your Current Team</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Position</th>
+          <th>Form</th>
+          <th>Points/Game</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for player in team %}
+        <tr>
+          <td>{{ player.name }}</td>
+          <td>{{ player.position }}</td>
+          <td>{{ player.form }}</td>
+          <td>{{ player.points_per_game }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Suggested Transfers</h2>
+    {% for item in replacements %}
+      <h3>Replace {{ item.out }} with:</h3>
+      <ul>
+        {% for rec in item.recommendations %}
+        <li>{{ rec.name }} - Form: {{ rec.form }}, PPG: {{ rec.points_per_game }}</li>
+        {% endfor %}
+      </ul>
+    {% endfor %}
+  </div>
+
+  <a href="/">← Back to Form</a>
+</body>
+</html>
