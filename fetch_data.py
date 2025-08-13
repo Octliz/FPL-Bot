@@ -61,40 +61,23 @@ def login():
     else:
         return jsonify({"error": "Login failed"}), 401
 
-@app.route("/my_team_analysis", methods=["GET"])
+@app.route("/my_team_analysis")
 def my_team_analysis():
     team_id = request.args.get("team_id")
     if not team_id:
-        return jsonify({"error": "Missing team_id parameter"}), 400
-
-    cookies = request.cookies.get('session')
-    headers = {"User-Agent": "Mozilla/5.0"}
+        return jsonify({"error": "No team ID provided"}), 400
 
     try:
-        url = MY_TEAM_URL_TEMPLATE.format(team_id=team_id)
-        response = requests.get(url, headers=headers, cookies={"session": cookies})
+        # Use public API instead of private one
+        url = f"https://fantasy.premierleague.com/api/entry/{team_id}/event/1/picks/"
+        response = requests.get(url)
         response.raise_for_status()
+
         team_data = response.json()
-    except Exception as e:
-        return jsonify({"error": f"Failed to fetch team data: {str(e)}"}), 500
+        return jsonify(team_data)
 
-    player_ids = [pick['element'] for pick in team_data['picks']]
-    all_data = fetch_fpl_data()
-    df = extract_player_stats(all_data)
-    my_team_df = df[df['id'].isin(player_ids)].copy()
-
-    my_team_df['form'] = my_team_df['form'].astype(float)
-    my_team_df['points_per_game'] = my_team_df['points_per_game'].astype(float)
-    weak_players = my_team_df.nsmallest(3, ['form', 'points_per_game'])[['id', 'name', 'form', 'points_per_game']]
-
-    replacements = []
-    for _, row in weak_players.iterrows():
-        same_position = my_team_df.loc[my_team_df['id'] == row['id'], 'position'].values[0]
-        same_position_pool = df[(df['position'] == same_position) & (~df['id'].isin(player_ids))]
-        suggestion = same_position_pool.head(3)[['name', 'form', 'points_per_game']].to_dict(orient='records')
-        replacements.append({"out": row['name'], "recommendations": suggestion})
-
-    return render_template("analysis.html", team=my_team_df.to_dict(orient="records"), replacements=replacements)
+    except requests.RequestException as e:
+        return jsonify({"error": f"Failed to fetch team data: {e}"}), 500
 
 @app.route("/transfer_plan", methods=["POST"])
 def transfer_plan():
