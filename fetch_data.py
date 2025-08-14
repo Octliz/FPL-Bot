@@ -75,14 +75,15 @@ def my_team_analysis():
         bootstrap_data = bootstrap_res.json()
 
         # Map team ID to short name
-        team_map = {
-            t["id"]: t["short_name"]
-            for t in bootstrap_data["teams"]
-        }
+        team_map = {t["id"]: t["short_name"] for t in bootstrap_data["teams"]}
 
-        # Map player element ID to "Name (TEAM)"
+        # Map player element ID to detailed info
         player_map = {
-            p["id"]: f"{p['first_name']} {p['second_name']} ({team_map.get(p['team'], 'UNK')})"
+            p["id"]: {
+                "name": f"{p['first_name']} {p['second_name']}",
+                "team": team_map.get(p["team"], "UNK"),
+                "position": p["element_type"],  # 1=GK, 2=DEF, 3=MID, 4=FWD
+            }
             for p in bootstrap_data["elements"]
         }
 
@@ -100,15 +101,30 @@ def my_team_analysis():
         picks_res.raise_for_status()
         picks_data = picks_res.json()
 
-        # Step 4: Replace element IDs with player names + team short names
+        # Step 4: Replace IDs with player data & sort by position
+        picks = []
         for pick in picks_data.get("picks", []):
-            element_id = pick["element"]
-            pick["player_name"] = player_map.get(element_id, f"Unknown ({element_id})")
+            player_info = player_map.get(pick["element"], {})
+            picks.append({
+                "player_name": player_info.get("name", "Unknown"),
+                "team": player_info.get("team", "UNK"),
+                "position": player_info.get("position", 0),
+                "is_captain": pick.get("is_captain", False),
+                "is_vice_captain": pick.get("is_vice_captain", False),
+            })
 
-        return jsonify(picks_data)
+        # Sort by position (1=GK, 2=DEF, 3=MID, 4=FWD)
+        picks.sort(key=lambda x: x["position"])
+
+        return jsonify({
+            "team_id": team_id,
+            "gameweek": current_gw,
+            "picks": picks
+        })
 
     except requests.RequestException as e:
         return jsonify({"error": f"Failed to fetch team data: {e}"}), 500
+
 
 
 @app.route("/transfer_plan", methods=["POST"])
