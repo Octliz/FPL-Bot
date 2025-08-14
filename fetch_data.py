@@ -68,7 +68,7 @@ def my_team_analysis():
         return jsonify({"error": "No team ID provided"}), 400
 
     try:
-        # Step 1: Get bootstrap data (players, teams, gameweek info)
+        # Step 1: Get bootstrap data
         bootstrap_url = "https://fantasy.premierleague.com/api/bootstrap-static/"
         bootstrap_res = requests.get(bootstrap_url)
         bootstrap_res.raise_for_status()
@@ -77,12 +77,21 @@ def my_team_analysis():
         # Map team ID to short name
         team_map = {t["id"]: t["short_name"] for t in bootstrap_data["teams"]}
 
+        # Position type mapping
+        position_map = {
+            1: "Goalkeeper",
+            2: "Defender",
+            3: "Midfielder",
+            4: "Forward"
+        }
+
         # Map player element ID to detailed info
         player_map = {
             p["id"]: {
                 "name": f"{p['first_name']} {p['second_name']}",
                 "team": team_map.get(p["team"], "UNK"),
-                "position": p["element_type"],  # 1=GK, 2=DEF, 3=MID, 4=FWD
+                "position": position_map.get(p["element_type"], "Unknown"),
+                "position_sort": p["element_type"]
             }
             for p in bootstrap_data["elements"]
         }
@@ -95,26 +104,26 @@ def my_team_analysis():
         if not current_gw:
             return jsonify({"error": "Could not determine current gameweek"}), 500
 
-        # Step 3: Fetch public picks for current gameweek
+        # Step 3: Fetch public picks
         picks_url = f"https://fantasy.premierleague.com/api/entry/{team_id}/event/{current_gw}/picks/"
         picks_res = requests.get(picks_url)
         picks_res.raise_for_status()
         picks_data = picks_res.json()
 
-        # Step 4: Replace IDs with player data & sort by position
+        # Step 4: Replace IDs with player data & sort
         picks = []
         for pick in picks_data.get("picks", []):
             player_info = player_map.get(pick["element"], {})
             picks.append({
                 "player_name": player_info.get("name", "Unknown"),
                 "team": player_info.get("team", "UNK"),
-                "position": player_info.get("position", 0),
+                "position": player_info.get("position", "Unknown"),
                 "is_captain": pick.get("is_captain", False),
                 "is_vice_captain": pick.get("is_vice_captain", False),
             })
 
-        # Sort by position (1=GK, 2=DEF, 3=MID, 4=FWD)
-        picks.sort(key=lambda x: x["position"])
+        # Sort by position (Goalkeeper → Defender → Midfielder → Forward)
+        picks.sort(key=lambda x: list(position_map.values()).index(x["position"]))
 
         return jsonify({
             "team_id": team_id,
@@ -124,6 +133,7 @@ def my_team_analysis():
 
     except requests.RequestException as e:
         return jsonify({"error": f"Failed to fetch team data: {e}"}), 500
+
 
 
 
