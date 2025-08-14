@@ -68,15 +68,21 @@ def my_team_analysis():
         return jsonify({"error": "No team ID provided"}), 400
 
     try:
-        # Step 1: Get the bootstrap data (contains players + gameweek info)
+        # Step 1: Get bootstrap data (players, teams, gameweek info)
         bootstrap_url = "https://fantasy.premierleague.com/api/bootstrap-static/"
         bootstrap_res = requests.get(bootstrap_url)
         bootstrap_res.raise_for_status()
         bootstrap_data = bootstrap_res.json()
 
-        # Map element ID to player name
+        # Map team ID to short name
+        team_map = {
+            t["id"]: t["short_name"]
+            for t in bootstrap_data["teams"]
+        }
+
+        # Map player element ID to "Name (TEAM)"
         player_map = {
-            p["id"]: f"{p['first_name']} {p['second_name']}"
+            p["id"]: f"{p['first_name']} {p['second_name']} ({team_map.get(p['team'], 'UNK')})"
             for p in bootstrap_data["elements"]
         }
 
@@ -94,7 +100,7 @@ def my_team_analysis():
         picks_res.raise_for_status()
         picks_data = picks_res.json()
 
-        # Step 4: Replace element IDs with player names
+        # Step 4: Replace element IDs with player names + team short names
         for pick in picks_data.get("picks", []):
             element_id = pick["element"]
             pick["player_name"] = player_map.get(element_id, f"Unknown ({element_id})")
@@ -103,6 +109,7 @@ def my_team_analysis():
 
     except requests.RequestException as e:
         return jsonify({"error": f"Failed to fetch team data: {e}"}), 500
+
 
 @app.route("/transfer_plan", methods=["POST"])
 def transfer_plan():
