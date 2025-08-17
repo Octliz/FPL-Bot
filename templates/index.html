@@ -3,36 +3,185 @@
 <head>
   <meta charset="UTF-8" />
   <title>FPL Assistant</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --bg:#0b1020; --card:#121933; --muted:#8ea0ff; --text:#e9ecff; --accent:#7cf; }
+    html,body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial; }
+    .container { max-width:1000px; margin:40px auto; padding:0 16px; }
+    h1 { font-weight:700; letter-spacing:.2px; }
+    .cards { display:grid; grid-template-columns:1fr; gap:16px; }
+    @media(min-width:900px){ .cards{ grid-template-columns:1fr 1fr; } }
+    .card { background:linear-gradient(180deg,rgba(255,255,255,.05),transparent 30%), var(--card); border:1px solid #1a2454; border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+    .card h2 { margin:0 0 12px 0; font-size:18px; color:var(--muted); }
+    .row { display:flex; gap:8px; align-items:center; }
+    .row > * { flex:1; }
+    input,select,button { background:#0f1730; color:var(--text); border:1px solid #24306b; border-radius:10px; padding:10px 12px; font-size:14px; }
+    button { background:linear-gradient(180deg,#1b63ff,#174fe0); border:0; cursor:pointer; font-weight:600; }
+    button:hover{ filter:brightness(1.08); }
+    .help { color:#aab7ff; font-size:12px; margin-top:6px; }
+    .section { margin-top:24px; }
+    table { width:100%; border-collapse:collapse; overflow:hidden; border-radius:12px; }
+    th, td { padding:10px; border-bottom:1px solid #24306b; font-size:14px; }
+    th { text-align:left; color:#b6c4ff; background:#0f1730; position:sticky; top:0; }
+    tr:hover td { background:rgba(255,255,255,.03); }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #2b3975; color:#cfe0ff; }
+    .img { width:28px; height:36px; object-fit:cover; border-radius:6px; border:1px solid #2b3975; background:#0b1020; }
+    a { color:var(--accent); text-decoration:none; }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media(max-width:700px){ .grid-2{ grid-template-columns:1fr; } }
+    .empty { color:#aab7ff; font-size:14px; padding:12px; }
+    .meta { color:#aab7ff; font-size:13px; margin-top:8px; }
+  </style>
 </head>
-<body class="bg-gray-100 text-gray-800 font-sans p-6">
-  <div class="max-w-xl mx-auto bg-white shadow-md rounded-xl p-6">
-    <h1 class="text-2xl font-bold text-center mb-4">FPL Assistant</h1>
-    <form id="teamForm" class="flex flex-col gap-3">
-      <label for="team_id" class="text-sm font-medium">Enter FPL Team ID:</label>
-      <input type="text" id="team_id" name="team_id" class="border rounded px-3 py-2" required />
-      <button type="submit" class="bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700">Analyze</button>
-    </form>
+<body>
+  <div class="container">
+    <h1>FPL Assistant</h1>
 
-    <div id="output" class="mt-6 p-4 bg-gray-50 border rounded overflow-auto text-sm whitespace-pre-wrap font-mono"></div>
+    <div class="cards">
+      <!-- Analyze Team -->
+      <div class="card">
+        <h2>Analyze Your Team</h2>
+        <form id="analyzeForm">
+          <div class="row">
+            <input id="teamId" name="team_id" placeholder="Enter FPL Team ID (e.g. 1234567)" required />
+            <button type="submit">Analyze</button>
+          </div>
+          <div class="help">Find your Team ID: Points/Pick Team page URL → <code>/entry/&lt;ID&gt;/</code>.</div>
+        </form>
+
+        <div id="analysisMeta" class="meta"></div>
+        <div class="section" id="squadSection"></div>
+      </div>
+
+      <!-- Transfer Plan -->
+      <div class="card">
+        <h2>Get Transfer Suggestions</h2>
+        <form id="planForm">
+          <div class="grid-2">
+            <input id="teamIdPlan" name="team_id" placeholder="Enter same FPL Team ID" required />
+            <select id="topN">
+              <option value="10">Top 10</option>
+              <option value="20" selected>Top 20</option>
+              <option value="30">Top 30</option>
+              <option value="50">Top 50</option>
+            </select>
+            <select id="minGain">
+              <option value="0.0">Any gain</option>
+              <option value="0.2" selected>≥ 0.2 EP</option>
+              <option value="0.5">≥ 0.5 EP</option>
+              <option value="1.0">≥ 1.0 EP</option>
+            </select>
+            <button type="submit">Suggest Transfers</button>
+          </div>
+          <div class="help">Returns single-transfer upgrades ranked by expected-points gain (budget-aware).</div>
+        </form>
+
+        <div id="planMeta" class="meta"></div>
+        <div class="section" id="planSection"></div>
+      </div>
+    </div>
   </div>
 
   <script>
-    const form = document.getElementById('teamForm');
-    const output = document.getElementById('output');
+    const fmtMoney = t => `£${(t/10).toFixed(1)}m`;
+    const el = id => document.getElementById(id);
 
-    form.addEventListener('submit', async (e) => {
+    // --- Analyze Team ---
+    el('analyzeForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const teamId = document.getElementById('team_id').value;
-      output.textContent = 'Loading...';
+      const teamId = el('teamId').value.trim();
+      if (!teamId) return;
 
-      try {
-        const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
-        const data = await res.json();
-        output.textContent = JSON.stringify(data, null, 2);
-      } catch (err) {
-        output.textContent = 'Error: ' + err.message;
+      const res = await fetch(`/my_team_analysis?team_id=${encodeURIComponent(teamId)}`);
+      const data = await res.json();
+
+      if (data.error) {
+        el('analysisMeta').textContent = `Error: ${data.error}`;
+        el('squadSection').innerHTML = '';
+        return;
       }
+
+      el('analysisMeta').textContent = `GW ${data.gameweek} • Bank: ${fmtMoney(data.bank_tenths_m)}`;
+
+      const rows = data.squad.map(p => `
+        <tr>
+          <td><img class="img" src="${p.image}" alt="" /></td>
+          <td><a href="${p.profile}" target="_blank" rel="noopener">${p.name}</a><div class="pill">${p.team}</div></td>
+          <td>${p.position}</td>
+          <td>${fmtMoney(p.now_cost)}</td>
+          <td>${(p.ep_next ?? 0).toFixed(2)}</td>
+          <td>${p.is_captain ? '©' : (p.is_vice_captain ? 'VC' : '')}</td>
+        </tr>
+      `).join('');
+
+      el('squadSection').innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th></th><th>Player</th><th>Pos</th><th>Price</th><th>EP (next)</th><th>C</th>
+            </tr>
+          </thead>
+          <tbody>${rows || `<tr><td colspan="6" class="empty">No picks found.</td></tr>`}</tbody>
+        </table>
+      `;
+    });
+
+    // --- Transfer Plan ---
+    el('planForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const teamId = el('teamIdPlan').value.trim();
+      const topN = parseInt(el('topN').value, 10);
+      const minGain = parseFloat(el('minGain').value);
+      if (!teamId) return;
+
+      const res = await fetch('/transfer_plan', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ team_id: teamId, top_n: topN, min_gain: minGain })
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        el('planMeta').textContent = `Error: ${data.error}`;
+        el('planSection').innerHTML = '';
+        return;
+      }
+
+      el('planMeta').textContent = `GW ${data.gameweek} • Bank: ${fmtMoney(data.bank_tenths_m)} • Suggestions: ${data.count}`;
+
+      const rows = (data.suggestions || []).map(s => `
+        <tr>
+          <td class="pill">OUT</td>
+          <td><img class="img" src="${s.out.image}" alt="" /></td>
+          <td><a href="${s.out.profile}" target="_blank" rel="noopener">${s.out.name}</a> <div class="pill">${s.out.team}</div></td>
+          <td>${s.out.position}</td>
+          <td>${fmtMoney(s.out.now_cost)}</td>
+          <td>${(s.out.ep_next ?? 0).toFixed(2)}</td>
+
+          <td class="pill">IN</td>
+          <td><img class="img" src="${s.in.image}" alt="" /></td>
+          <td><a href="${s.in.profile}" target="_blank" rel="noopener">${s.in.name}</a> <div class="pill">${s.in.team}</div></td>
+          <td>${s.in.position}</td>
+          <td>${fmtMoney(s.in.now_cost)}</td>
+          <td>${(s.in.ep_next ?? 0).toFixed(2)}</td>
+
+          <td style="white-space:nowrap">${s.expected_points_gain.toFixed(2)} EP</td>
+          <td style="white-space:nowrap">${s.cost_change >= 0 ? '+' : ''}${fmtMoney(s.cost_change)}</td>
+        </tr>
+      `).join('');
+
+      el('planSection').innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th></th><th></th><th>Player</th><th>Pos</th><th>Price</th><th>EP</th>
+              <th></th><th></th><th>Player</th><th>Pos</th><th>Price</th><th>EP</th>
+              <th>Gain</th><th>£Δ</th>
+            </tr>
+          </thead>
+          <tbody>${rows || `<tr><td colspan="14" class="empty">No upgrades found at this time.</td></tr>`}</tbody>
+        </table>
+      `;
     });
   </script>
 </body>
