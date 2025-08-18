@@ -36,14 +36,17 @@ def analyze_team(team_data, bootstrap):
         team = teams[player["team"]]
 
         spent += player["now_cost"] / 10.0
-        entry = {
-            "name": f"{player['first_name']} {player['second_name']}",
-            "team": team["name"],
-            "position": player["element_type"],
-            "price": player["now_cost"] / 10.0,
-            "points": player["event_points"],
-            "status": player["status"],
-        }
+        position_map = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
+
+entry = {
+    "name": f"{player['first_name']} {player['second_name']}",
+    "team": team["name"],
+    "position": position_map.get(player["element_type"], "Unknown"),
+    "price": player["now_cost"] / 10.0,
+    "points": player["event_points"],
+    "status": player["status"],
+}
+
 
         # Add flags
         flags = []
