@@ -19,7 +19,7 @@ def get_team(team_id):
     r.raise_for_status()
     return r.json()
 
-def analyze_team(team_data, players, teams):
+def analysis = analyze_team(team_data, players, teams):
     position_map = {
         1: "Goalkeeper",
         2: "Defender",
