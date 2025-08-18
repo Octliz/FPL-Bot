@@ -3,68 +3,64 @@
 <head>
   <meta charset="UTF-8">
   <title>FPL Assistant</title>
-  <style>
-    body { font-family: Arial, sans-serif; background: #f9fafb; padding: 20px; }
-    h1 { color: #2d3748; }
-    .container { max-width: 900px; margin: auto; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    th { background: #4a5568; color: white; }
-    .flags { color: red; font-size: 0.9em; }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="container">
-    <h1>⚽ FPL Assistant</h1>
-    <form action="/my_team_analysis" method="get">
-      <label>Enter FPL Team ID:</label>
-      <input type="text" name="team_id" required>
-      <button type="submit">Analyze</button>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
+  <h1 class="text-4xl font-bold text-green-700 mb-6">FPL Assistant</h1>
+
+  <!-- Input Form -->
+  <div class="bg-white shadow-md rounded-2xl p-6 mb-8 w-full max-w-md">
+    <h2 class="text-xl font-semibold mb-4">Analyze Your Team</h2>
+    <form id="teamForm" class="flex space-x-2">
+      <input 
+        type="text" 
+        id="teamId" 
+        placeholder="Enter FPL Team ID"
+        class="w-full border rounded-lg px-4 py-2"
+      />
+      <button 
+        type="submit"
+        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+      >
+        Analyze
+      </button>
     </form>
-
-    {% if team %}
-      <h2>My Squad</h2>
-      <table>
-        <tr>
-          <th>Name</th>
-          <th>Club</th>
-          <th>Position</th>
-          <th>Price</th>
-          <th>Points</th>
-          <th>Status</th>
-          <th>Flags</th>
-        </tr>
-        {% for p in team %}
-        <tr>
-          <td>{{ p.name }}</td>
-          <td>{{ p.team }}</td>
-          <td>{{ p.position }}</td>
-          <td>{{ p.price }}</td>
-          <td>{{ p.points }}</td>
-          <td>{{ p.status }}</td>
-          <td class="flags">{{ ", ".join(p.flags) }}</td>
-        </tr>
-        {% endfor %}
-      </table>
-
-      <h2>💡 Suggested Transfers</h2>
-      <table>
-        <tr>
-          <th>Out</th>
-          <th>In</th>
-          <th>Expected Gain</th>
-        </tr>
-        {% for s in suggestions %}
-        <tr>
-          <td>{{ s.out }}</td>
-          <td>{{ s.in }}</td>
-          <td>+{{ s.gain }} pts</td>
-        </tr>
-        {% endfor %}
-      </table>
-
-      <p><b>💰 Budget Left:</b> {{ budget_left }}m</p>
-    {% endif %}
   </div>
+
+  <!-- Player Grid -->
+  <div id="results" class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl"></div>
+
+  <script>
+    document.getElementById("teamForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const teamId = document.getElementById("teamId").value;
+      const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
+      const data = await res.json();
+
+      const results = document.getElementById("results");
+      results.innerHTML = "";
+
+      if (data.players) {
+        data.players.forEach(p => {
+          const card = document.createElement("div");
+          card.className = "bg-white shadow-lg rounded-2xl p-4 flex flex-col items-center";
+
+          card.innerHTML = `
+            <img src="${p.photo}" alt="${p.name}" class="w-24 h-24 rounded-full mb-3 border-2 border-green-600">
+            <h3 class="text-lg font-bold">${p.name}</h3>
+            <p class="text-sm text-gray-600">${p.position} - ${p.team}</p>
+            <img src="${p.team_badge}" alt="Badge" class="w-12 h-12 my-2">
+            <p class="text-sm mt-2">Form: <span class="font-semibold">${p.form}</span></p>
+            <p class="text-sm">PPG: <span class="font-semibold">${p.ppg}</span></p>
+            ${p.flags.length > 0 ? `<p class="text-red-600 text-sm mt-2">⚠ ${p.flags.join(", ")}</p>` : ""}
+          `;
+
+          results.appendChild(card);
+        });
+      } else {
+        results.innerHTML = `<p class="text-red-600">Error: ${data.error || "No data"}</p>`;
+      }
+    });
+  </script>
 </body>
 </html>
