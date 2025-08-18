@@ -19,66 +19,44 @@ def get_team(team_id):
     r.raise_for_status()
     return r.json()
 
-def analyze_team(team_data, bootstrap):
-    """Basic internal analysis + transfer suggestions."""
-    players = {p["id"]: p for p in bootstrap["elements"]}
-    teams = {t["id"]: t for t in bootstrap["teams"]}
-    picks = team_data.get("picks", [])
+def analyze_team(team_data, players, teams):
+    position_map = {
+        1: "Goalkeeper",
+        2: "Defender",
+        3: "Midfielder",
+        4: "Forward"
+    }
 
-    analysis = []
-    suggestions = []
+    results = []
+    for pick in team_data.get("picks", []):
+        player = next((p for p in players if p["id"] == pick["element"]), None)
+        team = next((t for t in teams if t["id"] == player["team"]), None) if player else None
 
-    budget = 100.0
-    spent = 0
+        if not player or not team:
+            continue
 
-    for pick in picks:
-        player = players[pick["element"]]
-        team = teams[player["team"]]
+        entry = {
+            "name": f"{player['first_name']} {player['second_name']}",
+            "team": team["name"],
+            "position": position_map.get(player["element_type"], "Unknown"),
+            "price": player["now_cost"] / 10.0,
+            "points": player["event_points"],
+            "status": player["status"],
+        }
 
-        spent += player["now_cost"] / 10.0
-
-position_map = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
-
-entry = {
-    "name": f"{player['first_name']} {player['second_name']}",
-    "team": team["name"],
-    "position": position_map.get(player["element_type"], "Unknown"),
-    "price": player["now_cost"] / 10.0,
-    "points": player["event_points"],
-    "status": player["status"],
-}
-
-
-
-        # Add flags
+        # Flags for injured, doubtful, suspended
         flags = []
-        if player["status"] != "a":
-            flags.append("🚑 Injury/Unavailable")
-        if player["chance_of_playing_next_round"] and player["chance_of_playing_next_round"] < 75:
-            flags.append(f"⚠️ Only {player['chance_of_playing_next_round']}% chance of playing")
-        if player["event_points"] < 2:
-            flags.append("⬇️ Low recent performance")
+        if player["status"] == "i":
+            flags.append("Injured")
+        elif player["status"] == "d":
+            flags.append("Doubtful")
+        elif player["status"] == "s":
+            flags.append("Suspended")
 
         entry["flags"] = flags
-        analysis.append(entry)
+        results.append(entry)
 
-        # Suggest transfer: very naive for now
-        if flags:
-            better_options = [
-                p for p in bootstrap["elements"]
-                if p["element_type"] == player["element_type"]
-                and p["now_cost"] <= player["now_cost"]
-                and p["event_points"] > player["event_points"]
-            ]
-            if better_options:
-                best = sorted(better_options, key=lambda x: x["event_points"], reverse=True)[0]
-                suggestions.append({
-                    "out": entry["name"],
-                    "in": f"{best['first_name']} {best['second_name']}",
-                    "gain": best["event_points"] - player["event_points"],
-                })
-
-    return analysis, suggestions, round(budget - spent, 1)
+    return results
 
 @app.route("/", methods=["GET"])
 def index():
