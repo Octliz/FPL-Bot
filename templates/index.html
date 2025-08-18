@@ -30,6 +30,12 @@
   <!-- Player Grid -->
   <div id="results" class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl"></div>
 
+  <!-- Suggested Transfers -->
+  <div id="transfers" class="bg-white shadow-md rounded-2xl p-6 mt-10 w-full max-w-3xl hidden">
+    <h2 class="text-2xl font-semibold text-green-700 mb-4">💡 Suggested Transfers</h2>
+    <ul id="transferList" class="list-disc list-inside text-gray-700"></ul>
+  </div>
+
   <script>
     document.getElementById("teamForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -38,7 +44,12 @@
       const data = await res.json();
 
       const results = document.getElementById("results");
+      const transfers = document.getElementById("transfers");
+      const transferList = document.getElementById("transferList");
+
       results.innerHTML = "";
+      transferList.innerHTML = "";
+      transfers.classList.add("hidden");
 
       if (data.players) {
         data.players.forEach(p => {
@@ -57,6 +68,16 @@
 
           results.appendChild(card);
         });
+
+        // Show suggested transfers if available
+        if (data.suggested_transfers && data.suggested_transfers.length > 0) {
+          data.suggested_transfers.forEach(t => {
+            const li = document.createElement("li");
+            li.textContent = `➡️ Replace ${t.out} with ${t.in}`;
+            transferList.appendChild(li);
+          });
+          transfers.classList.remove("hidden");
+        }
       } else {
         results.innerHTML = `<p class="text-red-600">Error: ${data.error || "No data"}</p>`;
       }
