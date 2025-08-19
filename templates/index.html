@@ -23,68 +23,25 @@
   </div>
 
   <script>
-    document.getElementById("teamForm").addEventListener("submit", async function(e) {
-      e.preventDefault();
-      const teamId = document.getElementById("teamId").value;
-      const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
-      const data = await res.json();
-
-      const resultsDiv = document.getElementById("results");
-      resultsDiv.innerHTML = "";
-
-      if (data.error) {
-        resultsDiv.innerHTML = `<p class="text-red-600">${data.error}</p>`;
+document.getElementById("analyzeBtn").addEventListener("click", async () => {
+    const teamId = document.getElementById("teamId").value.trim();
+    if (!teamId) {
+        alert("Please enter a valid FPL Team ID");
         return;
-      }
+    }
 
-      // --- TEAM ANALYSIS ---
-      let teamHtml = `<h2 class="text-2xl font-semibold mb-4">Your Squad</h2>
-                      <div class="grid md:grid-cols-3 gap-6">`;
+    try {
+        const response = await fetch(`/my_team_analysis?team_id=${teamId}`);
+        const data = await response.json();
 
-      data.team_analysis.forEach(p => {
-        const fixtures = p.fixtures.map(f => `<li>${f}</li>`).join("");
-        teamHtml += `
-          <div class="bg-white p-4 rounded-lg shadow">
-            <h3 class="font-bold text-lg">${p.name} (${p.team_name})</h3>
-            <p class="text-gray-700">💰 ${p.cost}m | ⭐ ${p.total_points} pts</p>
-            <h4 class="mt-2 font-semibold">Next Fixtures:</h4>
-            <ul class="list-disc list-inside text-sm text-gray-600">${fixtures}</ul>
-          </div>`;
-      });
-
-      teamHtml += `</div>`;
-      resultsDiv.innerHTML += teamHtml;
-
-      // --- SUGGESTED TRANSFERS ---
-      let transferHtml = `<h2 class="text-2xl font-semibold mb-4 mt-8">Suggested Transfers</h2>
-                          <div class="space-y-6">`;
-
-      data.suggested_transfers.forEach(tr => {
-        let inPlayers = tr.in.map(p => {
-          const fixtures = p.fixtures.map(f => `<li>${f}</li>`).join("");
-          return `
-            <div class="bg-green-50 p-3 rounded-lg shadow-sm">
-              <p class="font-bold">${p.name} (${p.team_name})</p>
-              <p class="text-gray-700">💰 ${p.cost}m | ⭐ ${p.total_points} pts</p>
-              <ul class="list-disc list-inside text-sm text-gray-600">${fixtures}</ul>
-            </div>`;
-        }).join("");
-
-        const outFixtures = tr.out_fixtures.map(f => `<li>${f}</li>`).join("");
-
-        transferHtml += `
-          <div class="bg-white p-4 rounded-lg shadow">
-            <p class="font-semibold text-red-600">Out: ${tr.out}</p>
-            <ul class="list-disc list-inside text-sm text-gray-600 mb-2">${outFixtures}</ul>
-            <div class="grid md:grid-cols-2 gap-4">
-              ${inPlayers}
-            </div>
-          </div>`;
-      });
-
-      transferHtml += `</div>`;
-      resultsDiv.innerHTML += transferHtml;
-    });
-  </script>
+        // Display results in the "results" div
+        const resultsDiv = document.getElementById("results");
+        resultsDiv.innerHTML = "<h2>Results</h2><pre>" + JSON.stringify(data, null, 2) + "</pre>";
+    } catch (err) {
+        console.error(err);
+        alert("Something went wrong! Check console for details.");
+    }
+});
+</script>
 </body>
 </html>
