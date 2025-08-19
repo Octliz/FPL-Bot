@@ -5,82 +5,85 @@
   <title>FPL Assistant</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
-  <h1 class="text-4xl font-bold text-green-700 mb-6">FPL Assistant</h1>
+<body class="bg-gray-100 text-gray-900 font-sans">
+  <div class="container mx-auto p-6">
+    <h1 class="text-3xl font-bold mb-6 text-center">⚽ FPL Assistant</h1>
 
-  <!-- Input Form -->
-  <div class="bg-white shadow-md rounded-2xl p-6 mb-8 w-full max-w-md">
-    <h2 class="text-xl font-semibold mb-4">Analyze Your Team</h2>
-    <form id="teamForm" class="flex space-x-2">
-      <input 
-        type="text" 
-        id="teamId" 
-        placeholder="Enter FPL Team ID"
-        class="w-full border rounded-lg px-4 py-2"
-      />
-      <button 
-        type="submit"
-        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-      >
+    <!-- Input Form -->
+    <form id="teamForm" class="flex justify-center mb-8">
+      <input type="text" id="teamId" placeholder="Enter your FPL Team ID"
+             class="border rounded-l px-4 py-2 w-64">
+      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700">
         Analyze
       </button>
     </form>
-  </div>
 
-  <!-- Player Grid -->
-  <div id="results" class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl"></div>
-
-  <!-- Suggested Transfers -->
-  <div id="transfers" class="bg-white shadow-md rounded-2xl p-6 mt-10 w-full max-w-3xl hidden">
-    <h2 class="text-2xl font-semibold text-green-700 mb-4">💡 Suggested Transfers</h2>
-    <ul id="transferList" class="list-disc list-inside text-gray-700"></ul>
+    <!-- Results -->
+    <div id="results" class="space-y-8"></div>
   </div>
 
   <script>
-    document.getElementById("teamForm").addEventListener("submit", async (e) => {
+    document.getElementById("teamForm").addEventListener("submit", async function(e) {
       e.preventDefault();
       const teamId = document.getElementById("teamId").value;
       const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
       const data = await res.json();
 
-      const results = document.getElementById("results");
-      const transfers = document.getElementById("transfers");
-      const transferList = document.getElementById("transferList");
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = "";
 
-      results.innerHTML = "";
-      transferList.innerHTML = "";
-      transfers.classList.add("hidden");
-
-      if (data.players) {
-        data.players.forEach(p => {
-          const card = document.createElement("div");
-          card.className = "bg-white shadow-lg rounded-2xl p-4 flex flex-col items-center";
-
-          card.innerHTML = `
-            <img src="${p.photo}" alt="${p.name}" class="w-24 h-24 rounded-full mb-3 border-2 border-green-600">
-            <h3 class="text-lg font-bold">${p.name}</h3>
-            <p class="text-sm text-gray-600">${p.position} - ${p.team}</p>
-            <img src="${p.team_badge}" alt="Badge" class="w-12 h-12 my-2">
-            <p class="text-sm mt-2">Form: <span class="font-semibold">${p.form}</span></p>
-            <p class="text-sm">PPG: <span class="font-semibold">${p.ppg}</span></p>
-            ${p.flags.length > 0 ? `<p class="text-red-600 text-sm mt-2">⚠ ${p.flags.join(", ")}</p>` : ""}
-          `;
-
-          results.appendChild(card);
-        });
-
-        // Show suggested transfers if available
-        if (data.suggested_transfers && data.suggested_transfers.length > 0) {
-          data.suggested_transfers.forEach(t => {
-            const li = document.createElement("li");
-            li.textContent = `➡️ Replace ${t.out} with ${t.in}`;
-            transferList.appendChild(li);
-          });
-          transfers.classList.remove("hidden");
-        }
-      } else {
-        results.innerHTML = `<p class="text-red-600">Error: ${data.error || "No data"}</p>`;
+      if (data.error) {
+        resultsDiv.innerHTML = `<p class="text-red-600">${data.error}</p>`;
+        return;
       }
+
+      // --- TEAM ANALYSIS ---
+      let teamHtml = `<h2 class="text-2xl font-semibold mb-4">Your Squad</h2>
+                      <div class="grid md:grid-cols-3 gap-6">`;
+
+      data.team_analysis.forEach(p => {
+        const fixtures = p.fixtures.map(f => `<li>${f}</li>`).join("");
+        teamHtml += `
+          <div class="bg-white p-4 rounded-lg shadow">
+            <h3 class="font-bold text-lg">${p.name} (${p.team_name})</h3>
+            <p class="text-gray-700">💰 ${p.cost}m | ⭐ ${p.total_points} pts</p>
+            <h4 class="mt-2 font-semibold">Next Fixtures:</h4>
+            <ul class="list-disc list-inside text-sm text-gray-600">${fixtures}</ul>
+          </div>`;
+      });
+
+      teamHtml += `</div>`;
+      resultsDiv.innerHTML += teamHtml;
+
+      // --- SUGGESTED TRANSFERS ---
+      let transferHtml = `<h2 class="text-2xl font-semibold mb-4 mt-8">Suggested Transfers</h2>
+                          <div class="space-y-6">`;
+
+      data.suggested_transfers.forEach(tr => {
+        let inPlayers = tr.in.map(p => {
+          const fixtures = p.fixtures.map(f => `<li>${f}</li>`).join("");
+          return `
+            <div class="bg-green-50 p-3 rounded-lg shadow-sm">
+              <p class="font-bold">${p.name} (${p.team_name})</p>
+              <p class="text-gray-700">💰 ${p.cost}m | ⭐ ${p.total_points} pts</p>
+              <ul class="list-disc list-inside text-sm text-gray-600">${fixtures}</ul>
+            </div>`;
+        }).join("");
+
+        const outFixtures = tr.out_fixtures.map(f => `<li>${f}</li>`).join("");
+
+        transferHtml += `
+          <div class="bg-white p-4 rounded-lg shadow">
+            <p class="font-semibold text-red-600">Out: ${tr.out}</p>
+            <ul class="list-disc list-inside text-sm text-gray-600 mb-2">${outFixtures}</ul>
+            <div class="grid md:grid-cols-2 gap-4">
+              ${inPlayers}
+            </div>
+          </div>`;
+      });
+
+      transferHtml += `</div>`;
+      resultsDiv.innerHTML += transferHtml;
     });
   </script>
 </body>
