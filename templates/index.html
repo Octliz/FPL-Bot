@@ -2,46 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FPL Assistant</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 text-gray-900 font-sans">
-  <div class="container mx-auto p-6">
-    <h1 class="text-3xl font-bold mb-6 text-center">⚽ FPL Assistant</h1>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen">
+  <div class="bg-white p-8 rounded-2xl shadow-md w-full max-w-lg">
+    <h1 class="text-2xl font-bold text-center mb-6 flex items-center justify-center gap-2">
+      <span>⚽</span> FPL Assistant
+    </h1>
 
     <!-- Input Form -->
-    <form id="teamForm" class="flex justify-center mb-8">
-      <input type="text" id="teamId" placeholder="Enter your FPL Team ID"
-             class="border rounded-l px-4 py-2 w-64">
-      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700">
-        Analyze
-      </button>
-    </form>
+    <label for="teamId" class="block mb-2 font-medium">Enter FPL Team ID:</label>
+    <input 
+      type="text" 
+      id="teamId" 
+      placeholder="e.g., 1234567"
+      class="w-full p-2 border border-gray-300 rounded-lg mb-4"
+    />
+    <button 
+      onclick="analyzeTeam()"
+      class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+    >
+      Analyze
+    </button>
 
-    <!-- Results -->
-    <div id="results" class="space-y-8"></div>
+    <!-- Results Section -->
+    <div id="results" class="mt-6 bg-gray-50 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap"></div>
   </div>
 
   <script>
-document.getElementById("analyzeBtn").addEventListener("click", async () => {
-    const teamId = document.getElementById("teamId").value.trim();
-    if (!teamId) {
-        alert("Please enter a valid FPL Team ID");
+    async function analyzeTeam() {
+      const teamId = document.getElementById("teamId").value;
+      if (!teamId) {
+        alert("Please enter your Team ID");
         return;
-    }
+      }
 
-    try {
+      try {
         const response = await fetch(`/my_team_analysis?team_id=${teamId}`);
         const data = await response.json();
-
-        // Display results in the "results" div
-        const resultsDiv = document.getElementById("results");
-        resultsDiv.innerHTML = "<h2>Results</h2><pre>" + JSON.stringify(data, null, 2) + "</pre>";
-    } catch (err) {
-        console.error(err);
-        alert("Something went wrong! Check console for details.");
+        document.getElementById("results").textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        document.getElementById("results").textContent = "Error: " + error;
+      }
     }
-});
-</script>
+  </script>
 </body>
 </html>
