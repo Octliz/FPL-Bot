@@ -7,46 +7,88 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen">
-  <div class="bg-white p-8 rounded-2xl shadow-md w-full max-w-lg">
-    <h1 class="text-2xl font-bold text-center mb-6 flex items-center justify-center gap-2">
+  <div class="bg-white p-8 rounded-2xl shadow-md w-full max-w-4xl">
+    <h1 class="text-3xl font-bold text-center mb-6 flex items-center justify-center gap-2">
       <span>⚽</span> FPL Assistant
     </h1>
 
     <!-- Input Form -->
     <label for="teamId" class="block mb-2 font-medium">Enter FPL Team ID:</label>
-    <input 
-      type="text" 
-      id="teamId" 
-      placeholder="e.g., 1234567"
-      class="w-full p-2 border border-gray-300 rounded-lg mb-4"
-    />
-    <button 
-      onclick="analyzeTeam()"
-      class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
-    >
-      Analyze
-    </button>
+    <div class="flex gap-2 mb-4">
+      <input 
+        type="text" 
+        id="teamId" 
+        placeholder="e.g., 1234567"
+        class="flex-grow p-2 border border-gray-300 rounded-lg"
+      />
+      <button 
+        onclick="analyzeTeam()"
+        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+      >
+        Analyze
+      </button>
+    </div>
 
     <!-- Results Section -->
-    <div id="results" class="mt-6 bg-gray-50 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap"></div>
+    <div id="results" class="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+    <!-- Suggestions Section -->
+    <div id="suggestions" class="mt-10">
+      <h2 class="text-xl font-semibold mb-4">Suggested Transfers</h2>
+      <ul id="suggestionList" class="list-disc pl-5 space-y-2"></ul>
+    </div>
   </div>
 
   <script>
-    async function analyzeTeam() {
-      const teamId = document.getElementById("teamId").value;
-      if (!teamId) {
-        alert("Please enter your Team ID");
-        return;
-      }
-
-      try {
-        const response = await fetch(`/my_team_analysis?team_id=${teamId}`);
-        const data = await response.json();
-        document.getElementById("results").textContent = JSON.stringify(data, null, 2);
-      } catch (error) {
-        document.getElementById("results").textContent = "Error: " + error;
-      }
+  async function analyzeTeam() {
+    const teamId = document.getElementById("team_id").value;
+    if (!teamId) {
+      alert("Please enter your FPL Team ID");
+      return;
     }
-  </script>
+
+    const response = await fetch(`/my_team_analysis?team_id=${teamId}`);
+    const data = await response.json();
+
+    const resultsDiv = document.getElementById("results");
+    resultsDiv.innerHTML = ""; // clear previous content
+
+    if (data.error) {
+      resultsDiv.innerHTML = `<p class="text-red-500">Error: ${data.error}</p>`;
+      return;
+    }
+
+    // Show squad
+    const squadHtml = `
+      <h2 class="text-xl font-bold mb-2">Your Squad</h2>
+      <ul class="mb-4 space-y-1">
+        ${data.squad.map(p => `
+          <li>
+            <span class="font-semibold">${p.name}</span> (${p.position}, ${p.team}, £${p.now_cost}m, PPG: ${p.points_per_game})
+          </li>
+        `).join("")}
+      </ul>
+    `;
+
+    // Show grouped suggestions
+    let suggestionsHtml = `<h2 class="text-xl font-bold mb-2">Suggested Transfers</h2>`;
+    for (const [position, suggestions] of Object.entries(data.suggestions)) {
+      if (suggestions.length === 0) continue;
+      suggestionsHtml += `
+        <h3 class="text-lg font-semibold mt-3">${position}</h3>
+        <ul class="mb-4 space-y-1">
+          ${suggestions.map(s => `
+            <li>
+              Out: <span class="font-semibold">${s.out}</span> → 
+              In: <span class="font-semibold">${s.in}</span> (${s.team}, £${s.price}m, PPG: ${s.ppg})
+            </li>
+          `).join("")}
+        </ul>
+      `;
+    }
+
+    resultsDiv.innerHTML = squadHtml + suggestionsHtml;
+  }
+</script>
 </body>
 </html>
