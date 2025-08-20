@@ -65,5 +65,5 @@ def analyze_team(team_data, players, teams):
         "suggestions": grouped_suggestions
     }
 
-    except Exception as e:
+   except Exception as e:
         return jsonify({"error": str(e)}), 500
