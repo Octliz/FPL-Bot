@@ -2,93 +2,129 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FPL Assistant</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+    header {
+      background: #2e3b55;
+      color: white;
+      padding: 1rem;
+    }
+    main {
+      padding: 2rem;
+    }
+    form {
+      margin-bottom: 2rem;
+    }
+    input[type="text"] {
+      padding: 0.5rem;
+      font-size: 1rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      background: #2e3b55;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1c2536;
+    }
+    .results {
+      text-align: left;
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .player {
+      padding: 0.5rem;
+      border-bottom: 1px solid #ddd;
+    }
+    .player:last-child {
+      border-bottom: none;
+    }
+    .suggestion {
+      background: #f0f8ff;
+      margin: 1rem 0;
+      padding: 1rem;
+      border-radius: 6px;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen">
-  <div class="bg-white p-8 rounded-2xl shadow-md w-full max-w-4xl">
-    <h1 class="text-3xl font-bold text-center mb-6 flex items-center justify-center gap-2">
-      <span>⚽</span> FPL Assistant
-    </h1>
+<body>
+  <header>
+    <h1>FPL Assistant</h1>
+    <p>Your Fantasy Premier League Team Analyzer</p>
+  </header>
 
-    <!-- Input Form -->
-    <label for="teamId" class="block mb-2 font-medium">Enter FPL Team ID:</label>
-    <div class="flex gap-2 mb-4">
-      <input 
-        type="text" 
-        id="teamId" 
-        placeholder="e.g., 1234567"
-        class="flex-grow p-2 border border-gray-300 rounded-lg"
-      />
-      <button 
-        onclick="analyzeTeam()"
-        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-      >
-        Analyze
-      </button>
-    </div>
+  <main>
+    <form id="teamForm">
+      <label for="team_id">Enter FPL Team ID:</label>
+      <input type="text" id="team_id" name="team_id" required>
+      <button type="submit">Analyze</button>
+    </form>
 
-    <!-- Results Section -->
-    <div id="results" class="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-
-    <!-- Suggestions Section -->
-    <div id="suggestions" class="mt-10">
-      <h2 class="text-xl font-semibold mb-4">Suggested Transfers</h2>
-      <ul id="suggestionList" class="list-disc pl-5 space-y-2"></ul>
-    </div>
-  </div>
+    <div id="output" class="results"></div>
+  </main>
 
   <script>
-  async function analyzeTeam() {
-    const teamId = document.getElementById("team_id").value;
-    if (!teamId) {
-      alert("Please enter your FPL Team ID");
-      return;
-    }
+    document.getElementById("teamForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const teamId = document.getElementById("team_id").value;
+      const output = document.getElementById("output");
+      output.innerHTML = "<p>Loading...</p>";
 
-    const response = await fetch(`/my_team_analysis?team_id=${teamId}`);
-    const data = await response.json();
+      try {
+        const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
+        const data = await res.json();
 
-    const resultsDiv = document.getElementById("results");
-    resultsDiv.innerHTML = ""; // clear previous content
+        if (data.error) {
+          output.innerHTML = `<p style="color:red;">Error: ${data.error}</p>`;
+          return;
+        }
 
-    if (data.error) {
-      resultsDiv.innerHTML = `<p class="text-red-500">Error: ${data.error}</p>`;
-      return;
-    }
+        let html = "<h2>Squad</h2>";
+        data.squad.forEach(p => {
+          const pos = {1: "GK", 2: "Def", 3: "Mid", 4: "Fwd"}[p.position] || "?";
+          html += `
+            <div class="player">
+              <strong>${p.name}</strong> (${pos}, ${p.team}) – £${p.now_cost}m, ${p.points_last_season} pts
+            </div>
+          `;
+        });
 
-    // Show squad
-    const squadHtml = `
-      <h2 class="text-xl font-bold mb-2">Your Squad</h2>
-      <ul class="mb-4 space-y-1">
-        ${data.squad.map(p => `
-          <li>
-            <span class="font-semibold">${p.name}</span> (${p.position}, ${p.team}, £${p.now_cost}m, PPG: ${p.points_per_game})
-          </li>
-        `).join("")}
-      </ul>
-    `;
+        if (data.suggestions && data.suggestions.length > 0) {
+          html += "<h2>Suggested Transfers</h2>";
+          data.suggestions.forEach(s => {
+            html += `
+              <div class="suggestion">
+                <p><strong>Out:</strong> ${s.out.name} (${s.out.team})</p>
+                <p><strong>In:</strong></p>
+                <ul>
+                  ${s.in.map(r => `<li>${r.name} (${r.team}) – £${r.now_cost}m, ${r.points_last_season} pts</li>`).join("")}
+                </ul>
+              </div>
+            `;
+          });
+        } else {
+          html += "<h2>No transfer suggestions right now 🎉</h2>";
+        }
 
-    // Show grouped suggestions
-    let suggestionsHtml = `<h2 class="text-xl font-bold mb-2">Suggested Transfers</h2>`;
-    for (const [position, suggestions] of Object.entries(data.suggestions)) {
-      if (suggestions.length === 0) continue;
-      suggestionsHtml += `
-        <h3 class="text-lg font-semibold mt-3">${position}</h3>
-        <ul class="mb-4 space-y-1">
-          ${suggestions.map(s => `
-            <li>
-              Out: <span class="font-semibold">${s.out}</span> → 
-              In: <span class="font-semibold">${s.in}</span> (${s.team}, £${s.price}m, PPG: ${s.ppg})
-            </li>
-          `).join("")}
-        </ul>
-      `;
-    }
-
-    resultsDiv.innerHTML = squadHtml + suggestionsHtml;
-  }
-</script>
+        output.innerHTML = html;
+      } catch (err) {
+        output.innerHTML = `<p style="color:red;">Error fetching team data</p>`;
+      }
+    });
+  </script>
 </body>
 </html>
