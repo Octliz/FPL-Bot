@@ -5,82 +5,64 @@
   <title>FPL Assistant</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 text-gray-900 min-h-screen">
-  <div class="max-w-5xl mx-auto py-8 px-4">
-    <h1 class="text-3xl font-bold mb-6 text-center">FPL Assistant</h1>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col items-center p-6">
+  <h1 class="text-3xl font-bold mb-6 flex items-center">
+    <span class="mr-2">⚽</span> FPL Assistant
+  </h1>
 
-    <!-- Form -->
-    <form id="teamForm" class="flex gap-2 justify-center mb-8">
-      <input type="text" id="team_id" placeholder="Enter FPL Team ID"
-             class="px-3 py-2 border rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-500">
-      <button type="submit"
-              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-        Analyze
-      </button>
-    </form>
-
-    <!-- Results -->
-    <div id="results" class="space-y-8"></div>
+  <!-- Input Form -->
+  <div class="w-full max-w-md bg-white shadow-md rounded-lg p-6">
+    <label for="teamId" class="block text-lg font-medium mb-2">Enter FPL Team ID:</label>
+    <input id="teamId" type="text" class="w-full border rounded p-2 mb-4" placeholder="e.g., 656120" />
+    <button id="analyzeBtn" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+      Analyze
+    </button>
   </div>
 
+  <!-- Results -->
+  <div id="results" class="w-full max-w-3xl mt-8"></div>
+
   <script>
-    document.getElementById("teamForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const teamId = document.getElementById("team_id").value.trim();
-      if (!teamId) return;
+    document.getElementById("analyzeBtn").addEventListener("click", () => {
+      const teamId = document.getElementById("teamId").value;
+      const resultDiv = document.getElementById("results");
+      resultDiv.innerHTML = "<p class='text-gray-500'>Analyzing...</p>";
 
-      const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
-      const data = await res.json();
+      fetch(`/my_team_analysis?team_id=${teamId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            resultDiv.innerHTML = `<p class="text-red-500">Error: ${data.error}</p>`;
+            return;
+          }
 
-      const resultsDiv = document.getElementById("results");
-      resultsDiv.innerHTML = "";
+          let html = "<h2 class='text-2xl font-bold mb-4'>Your Squad</h2>";
 
-      if (data.error) {
-        resultsDiv.innerHTML = `<p class="text-red-600">${data.error}</p>`;
-        return;
-      }
+          // Squad grouped by position
+          for (const [pos, players] of Object.entries(data.squad)) {
+            html += `<h3 class="text-xl font-semibold mt-6">${pos}</h3><ul class="list-disc ml-6">`;
+            players.forEach(p => {
+              html += `<li>${p.web_name} (${p.team}) — £${p.now_cost/10}m, Points: ${p.total_points}</li>`;
+            });
+            html += "</ul>";
+          }
 
-      // Squad display
-      let squadHtml = `<h2 class="text-2xl font-semibold mb-4">Your Squad</h2>
-                       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">`;
-      data.squad.forEach(p => {
-        squadHtml += `
-          <div class="bg-white rounded-xl shadow p-3 text-center">
-            <img src="${p.image}" alt="${p.name}" class="mx-auto mb-2 rounded">
-            <a href="${p.profile_url}" target="_blank" class="font-medium text-blue-600 hover:underline">${p.name}</a>
-            <p class="text-sm text-gray-500">${p.team}</p>
-            <p class="text-sm">${p.position} • £${p.now_cost}m</p>
-            <p class="text-xs text-gray-400">Pts last season: ${p.points_last_season}</p>
-          </div>`;
-      });
-      squadHtml += "</div>";
-      resultsDiv.innerHTML += squadHtml;
+          // Suggested transfers
+          if (data.suggested_transfers && data.suggested_transfers.length > 0) {
+            html += "<h2 class='text-2xl font-bold mt-8'>Suggested Transfers</h2><ul class='list-disc ml-6'>";
+            data.suggested_transfers.forEach(t => {
+              html += `<li>Out: <strong>${t.out}</strong> → In: <strong>${t.in}</strong> (${t.in_team}) — Points: ${t.points}, Cost: £${t.cost}m</li>`;
+            });
+            html += "</ul>";
+          } else {
+            html += "<p class='mt-6 text-gray-600'>No transfer suggestions (your squad looks solid!).</p>";
+          }
 
-      // Suggestions
-      let suggHtml = `<h2 class="text-2xl font-semibold mb-4">Suggested Transfers</h2>`;
-      if (data.suggestions.length === 0) {
-        suggHtml += `<p class="text-gray-600">No strong suggestions at the moment.</p>`;
-      } else {
-        data.suggestions.forEach(s => {
-          suggHtml += `
-            <div class="bg-white rounded-xl shadow p-4 mb-4">
-              <h3 class="font-bold mb-2">Consider replacing <span class="text-red-600">${s.out.name}</span></h3>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          `;
-          s.in.forEach(p => {
-            suggHtml += `
-              <div class="border rounded-lg p-3 text-center">
-                <img src="${p.image}" alt="${p.name}" class="mx-auto mb-2 rounded">
-                <a href="${p.profile_url}" target="_blank" class="font-medium text-blue-600 hover:underline">${p.name}</a>
-                <p class="text-sm text-gray-500">${p.team}</p>
-                <p class="text-sm">${p.position} • £${p.now_cost}m</p>
-                <p class="text-xs text-gray-400">Pts last season: ${p.points_last_season}</p>
-              </div>`;
-          });
-          suggHtml += "</div></div>";
+          resultDiv.innerHTML = html;
+        })
+        .catch(err => {
+          resultDiv.innerHTML = `<p class="text-red-500">Error: ${err.message}</p>`;
         });
-      }
-      resultsDiv.innerHTML += suggHtml;
     });
   </script>
 </body>
