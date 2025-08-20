@@ -3,127 +3,84 @@
 <head>
   <meta charset="UTF-8">
   <title>FPL Assistant</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f5f7fa;
-      margin: 0;
-      padding: 0;
-      text-align: center;
-    }
-    header {
-      background: #2e3b55;
-      color: white;
-      padding: 1rem;
-    }
-    main {
-      padding: 2rem;
-    }
-    form {
-      margin-bottom: 2rem;
-    }
-    input[type="text"] {
-      padding: 0.5rem;
-      font-size: 1rem;
-    }
-    button {
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
-      background: #2e3b55;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #1c2536;
-    }
-    .results {
-      text-align: left;
-      max-width: 800px;
-      margin: 0 auto;
-      background: white;
-      padding: 1rem;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .player {
-      padding: 0.5rem;
-      border-bottom: 1px solid #ddd;
-    }
-    .player:last-child {
-      border-bottom: none;
-    }
-    .suggestion {
-      background: #f0f8ff;
-      margin: 1rem 0;
-      padding: 1rem;
-      border-radius: 6px;
-    }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <header>
-    <h1>FPL Assistant</h1>
-    <p>Your Fantasy Premier League Team Analyzer</p>
-  </header>
+<body class="bg-gray-100 text-gray-900 min-h-screen">
+  <div class="max-w-5xl mx-auto py-8 px-4">
+    <h1 class="text-3xl font-bold mb-6 text-center">FPL Assistant</h1>
 
-  <main>
-    <form id="teamForm">
-      <label for="team_id">Enter FPL Team ID:</label>
-      <input type="text" id="team_id" name="team_id" required>
-      <button type="submit">Analyze</button>
+    <!-- Form -->
+    <form id="teamForm" class="flex gap-2 justify-center mb-8">
+      <input type="text" id="team_id" placeholder="Enter FPL Team ID"
+             class="px-3 py-2 border rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <button type="submit"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        Analyze
+      </button>
     </form>
 
-    <div id="output" class="results"></div>
-  </main>
+    <!-- Results -->
+    <div id="results" class="space-y-8"></div>
+  </div>
 
   <script>
-    document.getElementById("teamForm").addEventListener("submit", async function (e) {
+    document.getElementById("teamForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const teamId = document.getElementById("team_id").value;
-      const output = document.getElementById("output");
-      output.innerHTML = "<p>Loading...</p>";
+      const teamId = document.getElementById("team_id").value.trim();
+      if (!teamId) return;
 
-      try {
-        const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
-        const data = await res.json();
+      const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
+      const data = await res.json();
 
-        if (data.error) {
-          output.innerHTML = `<p style="color:red;">Error: ${data.error}</p>`;
-          return;
-        }
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = "";
 
-        let html = "<h2>Squad</h2>";
-        data.squad.forEach(p => {
-          const pos = {1: "GK", 2: "Def", 3: "Mid", 4: "Fwd"}[p.position] || "?";
-          html += `
-            <div class="player">
-              <strong>${p.name}</strong> (${pos}, ${p.team}) – £${p.now_cost}m, ${p.points_last_season} pts
-            </div>
-          `;
-        });
-
-        if (data.suggestions && data.suggestions.length > 0) {
-          html += "<h2>Suggested Transfers</h2>";
-          data.suggestions.forEach(s => {
-            html += `
-              <div class="suggestion">
-                <p><strong>Out:</strong> ${s.out.name} (${s.out.team})</p>
-                <p><strong>In:</strong></p>
-                <ul>
-                  ${s.in.map(r => `<li>${r.name} (${r.team}) – £${r.now_cost}m, ${r.points_last_season} pts</li>`).join("")}
-                </ul>
-              </div>
-            `;
-          });
-        } else {
-          html += "<h2>No transfer suggestions right now 🎉</h2>";
-        }
-
-        output.innerHTML = html;
-      } catch (err) {
-        output.innerHTML = `<p style="color:red;">Error fetching team data</p>`;
+      if (data.error) {
+        resultsDiv.innerHTML = `<p class="text-red-600">${data.error}</p>`;
+        return;
       }
+
+      // Squad display
+      let squadHtml = `<h2 class="text-2xl font-semibold mb-4">Your Squad</h2>
+                       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">`;
+      data.squad.forEach(p => {
+        squadHtml += `
+          <div class="bg-white rounded-xl shadow p-3 text-center">
+            <img src="${p.image}" alt="${p.name}" class="mx-auto mb-2 rounded">
+            <a href="${p.profile_url}" target="_blank" class="font-medium text-blue-600 hover:underline">${p.name}</a>
+            <p class="text-sm text-gray-500">${p.team}</p>
+            <p class="text-sm">${p.position} • £${p.now_cost}m</p>
+            <p class="text-xs text-gray-400">Pts last season: ${p.points_last_season}</p>
+          </div>`;
+      });
+      squadHtml += "</div>";
+      resultsDiv.innerHTML += squadHtml;
+
+      // Suggestions
+      let suggHtml = `<h2 class="text-2xl font-semibold mb-4">Suggested Transfers</h2>`;
+      if (data.suggestions.length === 0) {
+        suggHtml += `<p class="text-gray-600">No strong suggestions at the moment.</p>`;
+      } else {
+        data.suggestions.forEach(s => {
+          suggHtml += `
+            <div class="bg-white rounded-xl shadow p-4 mb-4">
+              <h3 class="font-bold mb-2">Consider replacing <span class="text-red-600">${s.out.name}</span></h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          `;
+          s.in.forEach(p => {
+            suggHtml += `
+              <div class="border rounded-lg p-3 text-center">
+                <img src="${p.image}" alt="${p.name}" class="mx-auto mb-2 rounded">
+                <a href="${p.profile_url}" target="_blank" class="font-medium text-blue-600 hover:underline">${p.name}</a>
+                <p class="text-sm text-gray-500">${p.team}</p>
+                <p class="text-sm">${p.position} • £${p.now_cost}m</p>
+                <p class="text-xs text-gray-400">Pts last season: ${p.points_last_season}</p>
+              </div>`;
+          });
+          suggHtml += "</div></div>";
+        });
+      }
+      resultsDiv.innerHTML += suggHtml;
     });
   </script>
 </body>
