@@ -1,72 +1,69 @@
-from flask import Flask, request, jsonify, render_template
-import requests
+@app.route("/my_team_analysis")
+def analyze_team(team_data, players, teams):
+    """
+    Analyze a team and suggest 2 alternative transfers per player,
+    grouped by position (GK, Def, Mid, Fwd).
+    """
 
-app = Flask(__name__)
+    # Map position ids to names
+    position_map = {
+        1: "GK",
+        2: "Def",
+        3: "Mid",
+        4: "Fwd"
+    }
 
-FPL_BOOTSTRAP = "https://fantasy.premierleague.com/api/bootstrap-static/"
-FPL_TEAM_URL = "https://fantasy.premierleague.com/api/entry/{team_id}/event/{gw}/picks/"
-
-# --- Helper function to analyze team ---
-def analyze_team(team_data, elements, element_types, teams):
-    players = []
-
+    # Build squad
+    squad = []
     for p in team_data["picks"]:
-        player = next((x for x in elements if x["id"] == p["element"]), None)
-        if not player:
-            continue
-
-        team = next((t for t in teams if t["id"] == player["team"]), None)
-
-        # Flags (injury, suspension, etc.)
-        flags = []
-        if player.get("news"):
-            flags.append(player["news"])
-
-        players.append({
+        player = players[p["element"]]
+        squad.append({
+            "id": player["id"],
             "name": player["web_name"],
-            "position": element_types[player["element_type"] - 1]["singular_name"],
-            "team": team["name"] if team else "Unknown",
-            "team_badge": f"https://resources.premierleague.com/premierleague/badges/t{player['team']}.png" if team else None,
-            "photo": f"https://resources.premierleague.com/premierleague/photos/players/110x140/p{player['photo'].replace('.jpg','')}.png",
-            "form": player["form"],
-            "ppg": player["points_per_game"],
-            "flags": flags
+            "team": teams[player["team"]],
+            "position": position_map[player["element_type"]],
+            "now_cost": player["now_cost"] / 10,  # convert to millions
+            "points_per_game": player["points_per_game"]
         })
 
-    return players
+    # Prepare grouped suggestions
+    grouped_suggestions = {
+        "GK": [],
+        "Def": [],
+        "Mid": [],
+        "Fwd": []
+    }
 
+    # Suggest 2 best alternatives for each player
+    for player in squad:
+        # Find numeric key for their position
+        pos_key = [k for k, v in position_map.items() if v == player["position"]][0]
+        max_price = player["now_cost"] * 10  # convert back to integer cost units
 
-# --- Flask Routes ---
-@app.route("/")
-def index():
-    return render_template("index.html")
+        # Candidates: same position, cheaper or equal price, not the same player
+        alternatives = [
+            p for p in players.values()
+            if p["element_type"] == pos_key and p["id"] != player["id"] and p["now_cost"] <= max_price
+        ]
 
+        # Sort by points per game, keep best 2
+        alternatives = sorted(alternatives, key=lambda x: float(x["points_per_game"]), reverse=True)[:2]
 
-@app.route("/my_team_analysis", methods=["GET"])
-def my_team_analysis():
-    try:
-        team_id = request.args.get("team_id")
-        if not team_id:
-            return jsonify({"error": "team_id is required"}), 400
+        # Add suggestions
+        for alt in alternatives:
+            grouped_suggestions[player["position"]].append({
+                "out": player["name"],
+                "in": alt["web_name"],
+                "team": teams[alt["team"]],
+                "position": position_map[alt["element_type"]],
+                "price": alt["now_cost"] / 10,
+                "ppg": alt["points_per_game"]
+            })
 
-        # Get bootstrap data
-        bootstrap = requests.get(FPL_BOOTSTRAP).json()
-        elements = bootstrap["elements"]
-        element_types = bootstrap["element_types"]
-        teams = bootstrap["teams"]
-
-        # Assume Gameweek 1 (later can make this dynamic)
-        gw = 1
-        team_data = requests.get(FPL_TEAM_URL.format(team_id=team_id, gw=gw)).json()
-
-        # Analyze
-        players = analyze_team(team_data, elements, element_types, teams)
-
-        return jsonify({"team_id": team_id, "players": players})
+    return {
+        "squad": squad,
+        "suggestions": grouped_suggestions
+    }
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
