@@ -5,64 +5,100 @@
   <title>FPL Assistant</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col items-center p-6">
-  <h1 class="text-3xl font-bold mb-6 flex items-center">
-    <span class="mr-2">⚽</span> FPL Assistant
-  </h1>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="w-full max-w-3xl bg-white shadow-lg rounded-xl p-6">
+    <h1 class="text-3xl font-bold text-center mb-6 text-green-700">⚽ FPL Assistant</h1>
 
-  <!-- Input Form -->
-  <div class="w-full max-w-md bg-white shadow-md rounded-lg p-6">
-    <label for="teamId" class="block text-lg font-medium mb-2">Enter FPL Team ID:</label>
-    <input id="teamId" type="text" class="w-full border rounded p-2 mb-4" placeholder="e.g., 656120" />
-    <button id="analyzeBtn" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
-      Analyze
-    </button>
+    <!-- Team ID Form -->
+    <form id="teamForm" class="flex items-center justify-center gap-2 mb-6">
+      <input type="text" id="team_id" placeholder="Enter FPL Team ID"
+        class="w-2/3 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+      <button type="submit"
+        class="px-4 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700">Analyze</button>
+    </form>
+
+    <!-- Results -->
+    <div id="results" class="space-y-6 hidden">
+      <!-- Players -->
+      <div>
+        <h2 class="text-xl font-semibold mb-2">Your Team</h2>
+        <div id="players" class="grid grid-cols-2 gap-2"></div>
+      </div>
+
+      <!-- Suggestions -->
+      <div>
+        <h2 class="text-xl font-semibold mb-2">Suggestions</h2>
+        <div id="suggestions" class="space-y-4"></div>
+      </div>
+    </div>
   </div>
 
-  <!-- Results -->
-  <div id="results" class="w-full max-w-3xl mt-8"></div>
-
   <script>
-    document.getElementById("analyzeBtn").addEventListener("click", () => {
-      const teamId = document.getElementById("teamId").value;
-      const resultDiv = document.getElementById("results");
-      resultDiv.innerHTML = "<p class='text-gray-500'>Analyzing...</p>";
+    document.getElementById("teamForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const teamId = document.getElementById("team_id").value;
+      const resultsDiv = document.getElementById("results");
+      const playersDiv = document.getElementById("players");
+      const suggestionsDiv = document.getElementById("suggestions");
 
-      fetch(`/my_team_analysis?team_id=${teamId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.error) {
-            resultDiv.innerHTML = `<p class="text-red-500">Error: ${data.error}</p>`;
-            return;
-          }
+      resultsDiv.classList.remove("hidden");
+      playersDiv.innerHTML = "<p class='text-gray-500'>Loading...</p>";
+      suggestionsDiv.innerHTML = "";
 
-          let html = "<h2 class='text-2xl font-bold mb-4'>Your Squad</h2>";
+      try {
+        const res = await fetch(`/my_team_analysis?team_id=${teamId}`);
+        const data = await res.json();
 
-          // Squad grouped by position
-          for (const [pos, players] of Object.entries(data.squad)) {
-            html += `<h3 class="text-xl font-semibold mt-6">${pos}</h3><ul class="list-disc ml-6">`;
-            players.forEach(p => {
-              html += `<li>${p.web_name} (${p.team}) — £${p.now_cost/10}m, Points: ${p.total_points}</li>`;
-            });
-            html += "</ul>";
-          }
+        if (data.error) {
+          playersDiv.innerHTML = `<p class="text-red-600">${data.error}</p>`;
+          return;
+        }
 
-          // Suggested transfers
-          if (data.suggested_transfers && data.suggested_transfers.length > 0) {
-            html += "<h2 class='text-2xl font-bold mt-8'>Suggested Transfers</h2><ul class='list-disc ml-6'>";
-            data.suggested_transfers.forEach(t => {
-              html += `<li>Out: <strong>${t.out}</strong> → In: <strong>${t.in}</strong> (${t.in_team}) — Points: ${t.points}, Cost: £${t.cost}m</li>`;
-            });
-            html += "</ul>";
-          } else {
-            html += "<p class='mt-6 text-gray-600'>No transfer suggestions (your squad looks solid!).</p>";
-          }
-
-          resultDiv.innerHTML = html;
-        })
-        .catch(err => {
-          resultDiv.innerHTML = `<p class="text-red-500">Error: ${err.message}</p>`;
+        // Players
+        playersDiv.innerHTML = "";
+        data.players.forEach(p => {
+          playersDiv.innerHTML += `
+            <div class="p-3 border rounded-lg bg-gray-50">
+              <p><strong>${p.name}</strong> (${p.position})</p>
+              <p class="text-sm text-gray-600">${p.team}</p>
+              <p class="text-sm">Points: ${p.points} | Price: £${p.now_cost}m</p>
+            </div>
+          `;
         });
+
+        // Suggestions
+        suggestionsDiv.innerHTML = "";
+
+        data.suggestions.forEach(s => {
+          if (s.captaincy) {
+            suggestionsDiv.innerHTML += `
+              <div class="p-4 border rounded-lg bg-green-50">
+                <h3 class="font-semibold mb-2">Captaincy Picks</h3>
+                <pre class="text-sm">${JSON.stringify(s.captaincy, null, 2)}</pre>
+              </div>
+            `;
+          }
+          if (s.transfer_tips) {
+            suggestionsDiv.innerHTML += `
+              <div class="p-4 border rounded-lg bg-blue-50">
+                <h3 class="font-semibold mb-2">Transfer Tips</h3>
+                <pre class="text-sm">${JSON.stringify(s.transfer_tips, null, 2)}</pre>
+              </div>
+            `;
+          }
+          if (s.lazyfpl_error) {
+            suggestionsDiv.innerHTML += `
+              <div class="p-4 border rounded-lg bg-red-50">
+                <h3 class="font-semibold mb-2">Error from LazyFPL</h3>
+                <p>${s.lazyfpl_error}</p>
+              </div>
+            `;
+          }
+        });
+
+      } catch (err) {
+        playersDiv.innerHTML = `<p class="text-red-600">Error fetching team: ${err.message}</p>`;
+      }
     });
   </script>
 </body>
