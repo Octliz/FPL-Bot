@@ -1,73 +1,75 @@
 from flask import Flask, render_template, request, jsonify
 import requests
-import pandas as pd
-import numpy as np
 from lazyfpl import FPL
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder="templates", static_folder="static")
 
 # ----------------------------
-# Helpers
+# Helper Functions
 # ----------------------------
+
 def get_bootstrap_data():
+    """Fetch general player + team data from FPL bootstrap."""
     url = "https://fantasy.premierleague.com/api/bootstrap-static/"
-    r = requests.get(url)
-    r.raise_for_status()
-    data = r.json()
-    return data["elements"], data["teams"]
+    response = requests.get(url)
+    response.raise_for_status()
+    data = response.json()
+    players = data["elements"]
+    teams = data["teams"]
+    return players, teams
 
 def get_team_data(team_id):
+    """Fetch a user's team data by ID."""
     url = f"https://fantasy.premierleague.com/api/entry/{team_id}/event/1/picks/"
-    r = requests.get(url)
-    r.raise_for_status()
-    return r.json()
+    response = requests.get(url)
+    response.raise_for_status()
+    return response.json()
 
 def analyze_team(team_data, players, teams):
-    # map player id -> player data
+    """Basic analysis of team (GK, DEF, MID, FWD split + suggestions)."""
+    picks = team_data.get("picks", [])
     player_map = {p["id"]: p for p in players}
     team_map = {t["id"]: t["name"] for t in teams}
 
-    picks = team_data.get("picks", [])
-    result = {"goalkeepers": [], "defenders": [], "midfielders": [], "forwards": []}
+    analysis = {"GK": [], "DEF": [], "MID": [], "FWD": []}
 
     for pick in picks:
-        p = player_map.get(pick["element"])
-        if not p:
-            continue
-        position = p["element_type"]
-        name = p["web_name"]
-        team_name = team_map[p["team"]]
-        player_info = {
-            "name": name,
-            "team": team_name,
-            "points": p["total_points"],
-            "price": p["now_cost"] / 10,
+        pid = pick["element"]
+        pdata = player_map.get(pid, {})
+        position = pdata.get("element_type")  # 1 = GK, 2 = DEF, 3 = MID, 4 = FWD
+        entry = {
+            "name": pdata.get("web_name"),
+            "team": team_map.get(pdata.get("team")),
+            "points": pdata.get("total_points"),
+            "selected_by": pdata.get("selected_by_percent"),
         }
         if position == 1:
-            result["goalkeepers"].append(player_info)
+            analysis["GK"].append(entry)
         elif position == 2:
-            result["defenders"].append(player_info)
+            analysis["DEF"].append(entry)
         elif position == 3:
-            result["midfielders"].append(player_info)
+            analysis["MID"].append(entry)
         elif position == 4:
-            result["forwards"].append(player_info)
+            analysis["FWD"].append(entry)
 
-    return result
+    return analysis
 
 def get_lazyfpl_tips():
-    """Fetch tips from LazyFPL"""
+    """Fetch tips and suggested transfers from LazyFPL."""
+    fpl = FPL()
+    # Get top picks (LazyFPL API wraps FPL community data)
     try:
-        fpl = FPL()
-        tips = fpl.tips()  # this returns a dict with captaincy, transfers, chips, etc.
-        return tips
+        top_picks = fpl.picks.top_picks()
+        return top_picks
     except Exception as e:
-        return {"error": f"Failed to fetch LazyFPL tips: {e}"}
+        return {"error": f"LazyFPL failed: {str(e)}"}
 
 # ----------------------------
 # Routes
 # ----------------------------
+
 @app.route("/")
-def index():
+def home():
     return render_template("index.html")
 
 @app.route("/my_team_analysis")
@@ -79,9 +81,16 @@ def my_team_analysis():
     try:
         players, teams = get_bootstrap_data()
         team_data = get_team_data(team_id)
-        analysis = analyze_team(team_data, players, teams)
+        result = analyze_team(team_data, players, teams)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/tips")
+def tips():
+    try:
         tips = get_lazyfpl_tips()
-        return jsonify({"analysis": analysis, "lazyfpl_tips": tips})
+        return jsonify(tips)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
