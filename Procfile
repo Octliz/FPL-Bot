@@ -1,1 +1,1 @@
-web: gunicorn fetch_data:app
+web: gunicorn fetch_data:app --bind 0.0.0.0:$PORT
